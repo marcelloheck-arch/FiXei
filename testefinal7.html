@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<title>Agendamentos Premium</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:sans-serif}
+body{background:#f4f5f7;color:#333;min-height:100vh;display:flex;flex-direction:column}
+header{padding:15px;text-align:center;font-size:1.8rem;color:#ffd633;background:#4a5a7a;box-shadow:0 0 10px rgba(0,0,0,0.2)}
+.container{flex:1;padding:10px;display:flex;flex-direction:column;align-items:center;width:100%}
+form{display:flex;flex-direction:column;gap:6px;width:100%;max-width:380px;margin-bottom:10px}
+input,select,button{padding:8px;border-radius:6px;border:1px solid #ccc;font-size:14px;width:100%}
+input,select{background:#fff;color:#333}
+button{background:#ffd633;color:#4a4a4a;font-weight:bold;cursor:pointer;transition:.2s}
+button:hover{background:#ffe266;transform:scale(1.02)}
+.list{display:flex;flex-direction:column;gap:6px;width:100%;max-width:420px}
+.card{padding:10px;border-radius:8px;background:#fff;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden;transition:transform 0.2s, box-shadow 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.1)}
+.card:hover{transform:scale(1.02);box-shadow:0 2px 10px rgba(0,0,0,0.2);}
+.card.active{animation:glow 2s infinite}
+@keyframes glow{0%,100%{box-shadow:0 0 6px rgba(255,210,51,0.2);}50%{box-shadow:0 0 15px rgba(255,210,51,0.5);}}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+.actions button{padding:4px 6px;font-size:12px;border-radius:4px}
+.total-ativos{font-size:16px;font-weight:bold;margin-bottom:8px;color:#007bff}
+.menu{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;width:100%;max-width:420px}
+.menu button{padding:10px;border-radius:5px;border:none;cursor:pointer;background:#e0e0e0;color:#333;text-align:left;transition:0.2s;font-size:15}
+.menu button:hover{background:#ffd633}
+.submenu{display:none;flex-direction:column;gap:12px;background:#f9f9f9;padding:10px;border-radius:10px;margin-top:6px;transition:all 0.3s;}
+.submenu.show{display:flex}
+.card-caixa{background:#fff;color:#333;padding:12px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.1);transition:transform 0.3s, box-shadow 0.3s;flex:1;min-width:220px;}
+.card-caixa:hover{transform:scale(1.02);box-shadow:0 4px 20px rgba(0,0,0,0.15);}
+.card-caixa h4{text-align:center;margin-bottom:8px;font-size:16px;color:#4a5a7a;}
+.card-caixa ul{list-style:none;padding-left:0;display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;}
+.card-caixa li{display:contents;font-size:14px;}
+.card-caixa li span{text-align:right;}
+.card-caixa li span:first-child{text-align:left;}
+.card-caixa .progress-bar{height:10px;border-radius:5px;background:#ddd;width:100%;margin-top:4px;overflow:hidden;}
+.card-caixa .progress{height:100%;border-radius:5px;background:#4da6ff;width:0%;transition:width 1s ease;}
+.gustavo{color:#4da6ff;font-weight:bold;}
+.gabriel{color:#28a745;font-weight:bold;}
+.heck{color:#ffb84d;font-weight:bold;}
+.animated-number{font-weight:bold;}
+.card-group{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+.dashboard-profissional{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+#clientesSection{display:none;width:100%;max-width:800px;margin-top:10px}
+#clientesList{width:100%;border-collapse:collapse;margin-top:10px}
+#clientesList th,#clientesList td{border:1px solid #ccc;padding:6px;font-size:14px;text-align:left}
+#clientesList th{background:#eee}
+
+/* Responsividade melhorada para iOS/Android e tablets */
+@media(max-width:1200px){.container,.form,.list,.menu{max-width:95%}.card-group{flex-direction:column;align-items:center}.card-caixa ul{grid-template-columns:1fr 1fr 1fr}}
+@media(max-width:900px){.container,.form,.list,.menu{max-width:90%}.card-group{flex-direction:column;align-items:center}.card-caixa ul{grid-template-columns:1fr 1fr 1fr}}
+@media(max-width:768px){header{font-size:1.6rem} form, .list, .menu{max-width:100%} .card-group{flex-direction:column} .card-caixa ul{grid-template-columns:1fr 1fr 1fr}}
+@media(max-width:600px){.container{padding:4px} form,.list,.menu{max-width:100%} #clientesList{font-size:12px} input,select,button{font-size:13px;padding:6px} header{font-size:1.4rem}}
+@media(max-width:480px){header{font-size:1.2rem} input,select,button{font-size:12px;padding:5px} #clientesList th,#clientesList td{font-size:11px;padding:4px}}
+</style>
+</head>
+<body>
+<header>📅 FiXei</header>
+
+<div class="menu">
+  <button id="btnAtivos">🏠 Ativos</button>
+  <button id="btnAtendidos">✅ Atendidos</button>
+  <button id="btnCaixa">📊 Caixa</button>
+  <button id="btnClientes">👥 Clientes</button>
+</div>
+
+<!-- Submenu Caixa -->
+<div id="submenuCaixa" class="submenu">
+  <label>Filtrar Profissional:</label>
+  <select id="filterProfessional"><option value="">Todos</option></select>
+  <label>Período:</label>
+  <input type="date" id="startDate">
+  <input type="date" id="endDate">
+  <button id="filterPeriodBtn">Filtrar Período</button>
+  <div class="card-group">
+    <div id="caixaDetails" class="card-caixa"></div>
+    <div id="caixaProfissional" class="card-caixa"></div>
+    <div id="caixaDia" class="card-caixa"></div>
+  </div>
+</div>
+
+<!-- Área Agendamentos -->
+<div class="container" id="agendamentosSection">
+  <div class="total-ativos">Ativos: <span id="totalAtivos">0</span></div>
+
+  <form id="appointmentForm">
+    <input type="text" id="name" placeholder="Nome do cliente" required>
+    <select id="service" required>
+      <option value="">Selecione o serviço</option>
+      <option value="Corte de cabelo">Corte de cabelo - R$50</option>
+      <option value="Cabelo e Barba">Cabelo e Barba - R$75</option>
+      <option value="Nevou">Nevou - R$130</option>
+      <option value="Mensal">Mensal - R$145</option>
+      <option value="Cabelo e Sombrancelha">Cabelo e Sombrancelha - R$60</option>
+      <option value="Cabelo e Luzes">Cabelo e Luzes - R$160</option>
+    </select>
+    <select id="professional" required>
+      <option value="">Selecione o profissional</option>
+    </select>
+    <input type="date" id="date" required>
+    <input type="time" id="time" required>
+    <button type="submit">Agendar</button>
+  </form>
+
+  <input type="text" id="searchInput" placeholder="🔍 Buscar cliente..." style="margin-bottom:8px;width:100%;max-width:380px;padding:6px;border-radius:6px;border:1px solid #ccc;background:#fff;color:#333;font-size:14px;">
+  <div id="ativos" class="list"></div>
+  <div id="atendidos" class="list" style="display:none"></div>
+</div>
+
+<!-- Área Clientes -->
+<div id="clientesSection" class="container">
+  <h3>👥 Gerenciamento de Clientes</h3>
+  <form id="clienteForm">
+    <input type="text" id="clienteNome" placeholder="Nome" required>
+    <input type="text" id="clienteTelefone" placeholder="Telefone">
+    <input type="email" id="clienteEmail" placeholder="E-mail">
+    <button type="submit">Cadastrar Cliente</button>
+  </form>
+  <input type="file" id="fileInput" accept=".xlsx,.csv" />
+  <input type="text" id="searchCliente" placeholder="🔍 Buscar cliente..." style="margin-top:8px;width:100%;max-width:400px;padding:6px;border-radius:6px;border:1px solid #ccc;">
+  <table id="clientesList">
+    <thead>
+      <tr><th>Nome</th><th>Telefone</th><th>Email</th><th>Ações</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+// ===== Dados gerais =====
+const servicePrices={"Corte de cabelo":50,"Cabelo e Barba":75,"Nevou":130,"Mensal":145,"Cabelo e Sombrancelha":60,"Cabelo e Luzes":160};
+const professionalsList=["Gustavo","Gabriel","Heck"];
+const professionalPercent={"Gustavo":1,"Gabriel":0.5,"Heck":0.4};
+const professionalColor={"Gustavo":"gustavo","Gabriel":"gabriel","Heck":"heck"};
+
+// LocalStorage helpers
+const getData=()=>JSON.parse(localStorage.getItem("appointments"))||[];
+const saveData=data=>localStorage.setItem("appointments",JSON.stringify(data));
+const getClientes=()=>JSON.parse(localStorage.getItem("clientes"))||[];
+const saveClientes=data=>localStorage.setItem("clientes",JSON.stringify(data));
+
+// ===== Elements =====
+const lists={ativos:document.getElementById("ativos"),atendidos:document.getElementById("atendidos")};
+const form=document.getElementById("appointmentForm");
+const searchInput=document.getElementById("searchInput");
+const btnCaixa=document.getElementById("btnCaixa");
+const submenuCaixa=document.getElementById("submenuCaixa");
+const caixaDetails=document.getElementById("caixaDetails");
+const caixaProfissional=document.getElementById("caixaProfissional");
+const filterProfessional=document.getElementById("filterProfessional");
+const startDate=document.getElementById("startDate");
+const endDate=document.getElementById("endDate");
+const filterPeriodBtn=document.getElementById("filterPeriodBtn");
+const btnAtivos=document.getElementById("btnAtivos");
+const btnAtendidos=document.getElementById("btnAtendidos");
+const totalAtivosSpan=document.getElementById("totalAtivos");
+const btnClientes=document.getElementById("btnClientes");
+const agendamentosSection=document.getElementById("agendamentosSection");
+const clientesSection=document.getElementById("clientesSection");
+
+// Populate profissionais
+function populateProfessionals(){
+    const professionalSelect=document.getElementById("professional");
+    professionalSelect.innerHTML='<option value="">Selecione o profissional</option>';
+    professionalsList.forEach(p=>{
+        const opt=document.createElement("option");
+        opt.value=p;
+        opt.textContent=p;
+        professionalSelect.appendChild(opt);
+    });
+    filterProfessional.innerHTML='<option value="">Todos</option>';
+    professionalsList.forEach(p=>{
+        const opt=document.createElement("option");
+        opt.value=p;
+        opt.textContent=p;
+        filterProfessional.appendChild(opt);
+    });
+}
+populateProfessionals();
+
+// ===== Render Agendamentos =====
+const renderAppointments=()=>{
+    const data=getData();
+    const query=(searchInput.value||"").toLowerCase();
+    let totalAtivos=0;
+
+    ["ativos","atendidos"].forEach(tab=>{
+        lists[tab].innerHTML="";
+        data.filter(d=>d.status===tab).forEach(app=>{
+            if(!app.name.toLowerCase().includes(query)) return;
+            const card=document.createElement("div");
+            card.className="card"+(tab==="ativos"?" active":"");
+            card.innerHTML = `<div>
+                <strong>${app.name}</strong> - ${app.service} (<span class="${professionalColor[app.professional]}">${app.professional}</span>)<br>
+                ${app.date} às ${app.time}<br>
+                R$ ${servicePrices[app.service].toFixed(2)}
+            </div>`;
+            const actions=document.createElement("div");
+            actions.className="actions";
+            if(tab==="ativos"){
+                totalAtivos++;
+                const btnDone=document.createElement("button");
+                btnDone.textContent="Atendido";
+                btnDone.style.background="#28a745";
+                btnDone.onclick=()=>markAttended(app.id);
+                actions.appendChild(btnDone);
+            }
+            const btnDel=document.createElement("button");
+            btnDel.textContent="Excluir";
+            btnDel.style.background="#dc3545";
+            btnDel.onclick=()=>deleteAppointment(app.id);
+            actions.appendChild(btnDel);
+            card.appendChild(actions);
+            lists[tab].appendChild(card);
+        });
+    });
+
+    animateNumber(totalAtivosSpan,totalAtivos);
+    updateCaixa();
+};
+
+// ===== Submit Agendamento =====
+form.onsubmit=e=>{
+    e.preventDefault();
+    const data=getData();
+    const app={
+        id:Date.now(),
+        name:document.getElementById("name").value,
+        service:document.getElementById("service").value,
+        professional:document.getElementById("professional").value,
+        date:document.getElementById("date").value,
+        time:document.getElementById("time").value,
+        status:"ativos"
+    };
+    data.push(app);
+    saveData(data);
+    form.reset();
+    renderAppointments();
+};
+
+const markAttended=id=>{
+    const data=getData();
+    const app=data.find(a=>a.id===id);
+    if(app) app.status="atendidos";
+    saveData(data);
+    renderAppointments();
+};
+
+const deleteAppointment=id=>{
+    let data=getData().filter(a=>a.id!==id);
+    saveData(data);
+    renderAppointments();
+};
+
+searchInput.addEventListener("input",renderAppointments);
+
+// ===== Menu toggles =====
+btnCaixa.onclick=()=>{
+    submenuCaixa.classList.toggle("show");
+    agendamentosSection.style.display = "flex";
+    clientesSection.style.display = "none";
+    lists.ativos.style.display = "flex";
+    lists.atendidos.style.display = "none";
+    updateCaixa();
+};
+btnClientes.onclick=()=>{
+    if(clientesSection.style.display==="flex"){
+        clientesSection.style.display="none";
+        agendamentosSection.style.display="flex";
+        lists.ativos.style.display="flex";
+        lists.atendidos.style.display="none";
+    }else{
+        clientesSection.style.display="flex";
+        agendamentosSection.style.display="none";
+        lists.ativos.style.display="none";
+        lists.atendidos.style.display="none";
+        submenuCaixa.classList.remove("show");
+    }
+};
+btnAtivos.onclick=()=>{
+    if(lists.ativos.style.display==="flex"){
+        lists.ativos.style.display="none";
+    }else{
+        agendamentosSection.style.display="flex";
+        clientesSection.style.display="none";
+        lists.ativos.style.display="flex";
+        lists.atendidos.style.display="none";
+        submenuCaixa.classList.remove("show");
+    }
+};
+btnAtendidos.onclick=()=>{
+    if(lists.atendidos.style.display==="flex"){
+        lists.atendidos.style.display="none";
+    }else{
+        agendamentosSection.style.display="flex";
+        clientesSection.style.display="none";
+        lists.ativos.style.display="none";
+        lists.atendidos.style.display="flex";
+        submenuCaixa.classList.remove("show");
+    }
+};
+
+filterPeriodBtn.onclick=()=>updateCaixa();
+
+// ===== Animate numbers =====
+function animateNumber(el,target){
+    let current=0;
+    const step=Math.max(1,target/30);
+    const interval=setInterval(()=>{
+        current+=step;
+        if(current>=target){
+            current=target;
+            clearInterval(interval);
+        }
+        el.textContent=parseFloat(current).toFixed(0);
+    },20);
+}
+
+// ===== Update Caixa =====
+function updateCaixa(){
+    let data=getData().filter(a=>a.status==="atendidos");
+    const selectedPro=filterProfessional.value;
+    const sDate=startDate.value?new Date(startDate.value):null;
+    const eDate=endDate.value?new Date(endDate.value):null;
+    let total=0;
+    const byServicePro={};
+    const byProfTotal={};
+    const byProfReceive={};
+    professionalsList.forEach(p=>{byProfTotal[p]=0;byProfReceive[p]=0;});
+    data.forEach(app=>{
+        const appDate=new Date(app.date);
+        if(!professionalsList.includes(app.professional)) return;
+        if(selectedPro && app.professional!==selectedPro) return;
+        if(sDate && appDate<sDate) return;
+        if(eDate && appDate>eDate) return;
+        const price=servicePrices[app.service]||0;
+        total+=price;
+        const key=app.service+" - "+app.professional;
+        byServicePro[key]=(byServicePro[key]||0)+price;
+        byProfTotal[app.professional]+=price;
+        byProfReceive[app.professional]+=price*professionalPercent[app.professional];
+    });
+
+    let html="<h4>Totais por Serviço e Profissional</h4><ul>";
+    for(let k in byServicePro){
+        const parts=k.split(" - ");
+        html+=`<li><span>${parts[0]}</span><span class="${professionalColor[parts[1]]}">${parts[1]}</span><span>${byServicePro[k].toFixed(2)}</span></li>`;
+    }
+    html+="</ul><h4>Total Geral: <span class='animated-number' data-value='"+total+"'>0</span></h4>";
+    caixaDetails.innerHTML=html;
+    document.querySelectorAll(".animated-number").forEach(el=>animateNumber(el,parseFloat(el.dataset.value)));
+
+    let htmlProf="<h4>Valores a Receber</h4>";
+    for(let p in byProfTotal){
+        if(selectedPro && p!==selectedPro) continue;
+        const percent = total>0?(byProfTotal[p]/total*100):0;
+        htmlProf+=`<div class="dashboard-profissional">
+            <span class="${professionalColor[p]}">${p}</span>
+            <span>Total Faturado: R$ ${byProfTotal[p].toFixed(2)}</span>
+            <span>A Receber: R$ ${byProfReceive[p].toFixed(2)}</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress" style="width:${percent}%;background:${p==='Gustavo'?'#4da6ff':p==='Gabriel'?'#28a745':'#ffb84d'}"></div>
+        </div>`;
+    }
+    caixaProfissional.innerHTML=htmlProf;
+}
+
+filterProfessional.addEventListener("change",updateCaixa);
+
+// ===== Clientes =====
+const clienteForm=document.getElementById("clienteForm");
+const clientesList=document.querySelector("#clientesList tbody");
+const fileInput=document.getElementById("fileInput");
+const searchCliente=document.getElementById("searchCliente");
+
+function renderClientes(){
+    const clientes=getClientes();
+    const query=(searchCliente.value||"").toLowerCase();
+    clientesList.innerHTML="";
+    clientes.filter(c=>c.nome.toLowerCase().includes(query)).forEach((c,i)=>{
+        const tr=document.createElement("tr");
+        tr.innerHTML=`<td>${c.nome}</td><td>${c.telefone||""}</td><td>${c.email||""}</td><td><button onclick="deleteCliente(${i})" style="background:#dc3545;color:white;border:none;padding:4px 6px;border-radius:4px;cursor:pointer">Excluir</button></td>`;
+        clientesList.appendChild(tr);
+    });
+}
+
+function deleteCliente(i){
+    let clientes=getClientes();
+    clientes.splice(i,1);
+    saveClientes(clientes);
+    renderClientes();
+}
+
+clienteForm.onsubmit=e=>{
+    e.preventDefault();
+    let clientes=getClientes();
+    clientes.push({
+        nome:document.getElementById("clienteNome").value,
+        telefone:document.getElementById("clienteTelefone").value,
+        email:document.getElementById("clienteEmail").value
+    });
+    saveClientes(clientes);
+    clienteForm.reset();
+    renderClientes();
+};
+
+fileInput.addEventListener("change",handleFile,false);
+function handleFile(e){
+    const file=e.target.files[0];
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=e=>{
+        const data=new Uint8Array(e.target.result);
+        const workbook=XLSX.read(data,{type:"array"});
+        const firstSheet=workbook.Sheets[workbook.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(firstSheet,{header:1});
+        let clientes=getClientes();
+        rows.slice(1).forEach(r=>{
+            if(r[0]) clientes.push({nome:r[0],telefone:r[1]||"",email:r[2]||""});
+        });
+        saveClientes(clientes);
+        renderClientes();
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+searchCliente.addEventListener("input",renderClientes);
+
+// Inicialização
+renderAppointments();
+renderClientes();
+
+</script>
+</body>
+</html>
